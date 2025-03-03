@@ -155,16 +155,26 @@ export const BinanceTab: React.FC = () => {
             const service = new BinanceService(apiKey, secretKey);
             
             if (startDate || endDate) {
-                const startTimestamp = startDate ? new Date(startDate + 'T00:00:00').getTime() : undefined;
-                const endTimestamp = endDate ? new Date(endDate + 'T23:59:59.999').getTime() : undefined;
+                // تعيين التواريخ مع الأخذ في الاعتبار توقيت الإمارات (UTC+4)
+                const startTimestamp = startDate ? (() => {
+                    const date = new Date(startDate);
+                    date.setHours(0, 0, 0, 0);
+                    date.setHours(date.getHours() + 4); // تعديل التوقيت للإمارات
+                    return date.getTime();
+                })() : undefined;
+
+                const endTimestamp = endDate ? (() => {
+                    const date = new Date(endDate);
+                    date.setHours(23, 59, 59, 999);
+                    date.setHours(date.getHours() + 4); // تعديل التوقيت للإمارات
+                    return date.getTime();
+                })() : undefined;
                 
                 console.log('=== Debug Date Conversion ===');
-                console.log('Start Date String:', startDate ? startDate + 'T00:00:00' : null);
-                console.log('End Date String:', endDate ? endDate + 'T23:59:59.999' : null);
+                console.log('Start Date String:', startDate ? new Date(startTimestamp!).toISOString() : null);
+                console.log('End Date String:', endDate ? new Date(endTimestamp!).toISOString() : null);
                 console.log('Start Timestamp:', startTimestamp);
                 console.log('End Timestamp:', endTimestamp);
-                console.log('Start Date Converted:', startTimestamp ? new Date(startTimestamp).toISOString() : null);
-                console.log('End Date Converted:', endTimestamp ? new Date(endTimestamp).toISOString() : null);
                 
                 service.setDateRange(startTimestamp, endTimestamp);
             }
