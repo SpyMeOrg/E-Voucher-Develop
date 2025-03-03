@@ -19,7 +19,6 @@ export const BinanceTab: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(0);
     const [totalOrders, setTotalOrders] = useState(0);
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
     
     // إضافة حالات جديدة لنظام حفظ المفاتيح
     const [savedCredentials, setSavedCredentials] = useState<SavedCredential[]>([]);
@@ -29,10 +28,8 @@ export const BinanceTab: React.FC = () => {
     
     // إضافة حالة جديدة للتحكم في ظهور قسم الفلترة
     const [isConnected, setIsConnected] = useState<boolean>(false);
-    const [fetchingData, setFetchingData] = useState<boolean>(false);
-
-    // إضافة حالة جديدة للتحكم في حالة تحميل البيانات
-    const [isInitialLoading, setIsInitialLoading] = useState(false);
+    
+    // حالة التحميل الموحدة
     const [loadingState, setLoadingState] = useState<'idle' | 'loading' | 'loadingMore'>('idle');
 
     // استرجاع المفاتيح المحفوظة عند تحميل المكون
@@ -146,20 +143,17 @@ export const BinanceTab: React.FC = () => {
         console.log('End Date Input:', endDate);
 
         if (page === 1) {
-            setIsInitialLoading(true);
             setLoadingState('loading');
             setOrders([]);
             setFilteredOrders([]);
         } else {
             setLoadingState('loadingMore');
-            setIsLoadingMore(true);
         }
         setError(null);
 
         try {
             const service = new BinanceService(apiKey, secretKey);
             
-            // تعيين نطاق التاريخ بشكل صحيح
             if (startDate || endDate) {
                 const startTimestamp = startDate ? new Date(startDate + 'T00:00:00').getTime() : undefined;
                 const endTimestamp = endDate ? new Date(endDate + 'T23:59:59.999').getTime() : undefined;
@@ -207,9 +201,6 @@ export const BinanceTab: React.FC = () => {
             setError(err instanceof Error ? err.message : 'حدث خطأ في جلب البيانات من Binance');
         } finally {
             setLoadingState('idle');
-            setIsInitialLoading(false);
-            setIsLoadingMore(false);
-            setFetchingData(false);
         }
     };
 
