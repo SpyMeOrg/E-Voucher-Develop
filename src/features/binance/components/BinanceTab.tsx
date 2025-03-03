@@ -159,14 +159,12 @@ export const BinanceTab: React.FC = () => {
                 const startTimestamp = startDate ? (() => {
                     const date = new Date(startDate);
                     date.setHours(0, 0, 0, 0);
-                    date.setHours(date.getHours() + 4); // تعديل التوقيت للإمارات
                     return date.getTime();
                 })() : undefined;
 
                 const endTimestamp = endDate ? (() => {
                     const date = new Date(endDate);
                     date.setHours(23, 59, 59, 999);
-                    date.setHours(date.getHours() + 4); // تعديل التوقيت للإمارات
                     return date.getTime();
                 })() : undefined;
                 
