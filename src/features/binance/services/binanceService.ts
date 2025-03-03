@@ -1,4 +1,4 @@
-import { BinanceOrder } from '../types/orders';
+import { BinanceOrder, PaginatedResponse } from '../types/orders';
 
 declare global {
     interface Window {
@@ -12,10 +12,32 @@ export class BinanceService {
     private apiKey: string;
     private secretKey: string;
     private recvWindow = 60000;
+    private startTime?: number;
+    private endTime?: number;
 
     constructor(apiKey: string, secretKey: string) {
         this.apiKey = apiKey;
         this.secretKey = secretKey;
+    }
+
+    setDateRange(startTime?: number, endTime?: number) {
+        if (startTime) {
+            // تحويل التاريخ إلى توقيت UTC
+            const startDate = new Date(startTime);
+            startDate.setHours(startDate.getHours() - 4); // تعويض فرق التوقيت
+            this.startTime = startDate.getTime();
+        } else {
+            this.startTime = undefined;
+        }
+
+        if (endTime) {
+            // تحويل التاريخ إلى توقيت UTC
+            const endDate = new Date(endTime);
+            endDate.setHours(endDate.getHours() - 4); // تعويض فرق التوقيت
+            this.endTime = endDate.getTime();
+        } else {
+            this.endTime = undefined;
+        }
     }
 
     async checkServerTime(): Promise<number> {
@@ -42,22 +64,39 @@ export class BinanceService {
         }
     }
 
-    async getP2POrders() {
+    async getP2POrders(page: number = 1, limit: number = 100): Promise<PaginatedResponse> {
         try {
             const timestamp = Date.now();
             await this.validateTimestamp(timestamp);
 
+            console.log('=== Debug Timestamps ===');
+            console.log('Start Time (raw):', this.startTime);
+            console.log('End Time (raw):', this.endTime);
+            console.log('Start Time (date):', this.startTime ? new Date(this.startTime).toISOString() : null);
+            console.log('End Time (date):', this.endTime ? new Date(this.endTime).toISOString() : null);
+
             const queryParams = new URLSearchParams({
                 timestamp: timestamp.toString(),
-                recvWindow: this.recvWindow.toString()
+                recvWindow: this.recvWindow.toString(),
+                page: page.toString(),
+                rows: limit.toString()
             });
+
+            // إرسال التواريخ كما هي بدون معالجة
+            if (this.startTime) {
+                queryParams.append('startTime', this.startTime.toString());
+            }
+            if (this.endTime) {
+                queryParams.append('endTime', this.endTime.toString());
+            }
 
             const signature = window.CryptoJS.HmacSHA256(queryParams.toString(), this.secretKey).toString();
             queryParams.append('signature', signature);
 
             const url = `${this.proxyUrl}${this.baseUrl}/sapi/v1/c2c/orderMatch/listUserOrderHistory?${queryParams.toString()}`;
-            
-            console.log('جاري الاتصال مع:', url);
+            console.log('=== Debug Request ===');
+            console.log('Request URL:', url);
+            console.log('Query Params:', Object.fromEntries(queryParams.entries()));
             
             const response = await fetch(url, {
                 method: 'GET',
@@ -69,6 +108,7 @@ export class BinanceService {
 
             if (!response.ok) {
                 const errorData = await response.json();
+                console.error('API Error Response:', errorData);
                 if (response.status === 429) {
                     throw new Error('تم تجاوز حد الطلبات المسموح به');
                 } else if (response.status === 418) {
@@ -78,14 +118,30 @@ export class BinanceService {
             }
 
             const data = await response.json();
-            console.log('البيانات المستلمة من Binance:', data);
+            console.log('=== Debug Response ===');
+            console.log('Raw Response:', data);
 
             if (!data || !Array.isArray(data.data)) {
                 console.error('شكل البيانات غير صحيح:', data);
                 throw new Error('البيانات المستلمة غير صالحة');
             }
 
-            return this.transformOrders(data.data);
+            // تحويل الأوردرات وطباعة التواريخ للتحقق
+            const transformedOrders = this.transformOrders(data.data);
+            console.log('=== Debug Orders ===');
+            console.log('First Order Time:', transformedOrders[0]?.createTime ? new Date(transformedOrders[0].createTime).toISOString() : null);
+            console.log('Last Order Time:', transformedOrders[transformedOrders.length - 1]?.createTime ? 
+                new Date(transformedOrders[transformedOrders.length - 1].createTime).toISOString() : null);
+
+            const total = data.total || data.data.length;
+            const totalPages = Math.ceil(total / limit);
+
+            return {
+                total,
+                orders: transformedOrders,
+                currentPage: page,
+                totalPages
+            };
 
         } catch (error) {
             console.error('خطأ في getP2POrders:', error);
@@ -97,51 +153,34 @@ export class BinanceService {
     }
 
     private transformOrders(data: any[]): BinanceOrder[] {
-        return data.map(order => {
-            if (!order || typeof order !== 'object') {
-                console.warn('تم تخطي أوردر غير صالح:', order);
-                return null;
-            }
+        // تحويل الأوردرات
+        const orders = data.map(order => {
+            const cryptoAmount = this.parseNumber(order.amount);
+            const isTakerOrder = order.commission === 0;
+            const fee = isTakerOrder ? 0.05 : this.parseNumber(order.commission);
+            
+            const actualUsdt = order.tradeType === 'BUY' ? 
+                cryptoAmount - (isTakerOrder ? 0.05 : fee) :
+                cryptoAmount + (isTakerOrder ? 0.05 : fee);
 
-            try {
-                // تأكد من وجود البيانات الأساسية
-                if (!order.orderNumber || !order.totalPrice || !order.amount || !order.unitPrice) {
-                    console.warn('بيانات الأوردر غير مكتملة:', order);
-                    return null;
-                }
+            // نستخدم التاريخ كما هو من بينانس بدون تعديل
+            const transformedOrder: BinanceOrder = {
+                orderId: order.orderNumber,
+                type: order.tradeType as 'BUY' | 'SELL',
+                fiatAmount: this.parseNumber(order.totalPrice),
+                price: this.parseNumber(order.unitPrice),
+                cryptoAmount: cryptoAmount,
+                fee: fee,
+                netAmount: cryptoAmount,
+                actualUsdt: actualUsdt,
+                status: this.mapOrderStatus(order.orderStatus),
+                createTime: order.createTime
+            };
+            return transformedOrder;
+        });
 
-                const type = (order.tradeType || '').toString().toUpperCase();
-                if (type !== 'BUY' && type !== 'SELL') {
-                    console.warn('نوع الأوردر غير صالح:', type);
-                    return null;
-                }
-
-                // معالجة الرسوم - إذا كان taker نضع 0.05 وإلا نستخدم القيمة من الـ API
-                const isTaker = order.orderSource === 'TAKER';
-                const fee = isTaker ? 0.05 : (order.commission ? Number(order.commission) : 0.05);
-
-                // حساب الكمية الصافية (بعد خصم الرسوم)
-                const cryptoAmount = this.parseNumber(order.amount);
-                const netAmount = type === 'BUY' ? 
-                    cryptoAmount - fee :  // في الشراء: نخصم الرسوم من الكمية
-                    cryptoAmount + fee;   // في البيع: نضيف الرسوم على الكمية
-
-                return {
-                    orderId: order.orderNumber,
-                    type: type as 'BUY' | 'SELL',
-                    fiatAmount: this.parseNumber(order.totalPrice),
-                    price: this.parseNumber(order.unitPrice),
-                    cryptoAmount: cryptoAmount,
-                    fee: fee,
-                    netAmount: netAmount,
-                    status: this.mapOrderStatus(order.orderStatus),
-                    createTime: order.createTime
-                };
-            } catch (error) {
-                console.error('خطأ في تحويل الأوردر:', error, order);
-                return null;
-            }
-        }).filter(order => order !== null) as BinanceOrder[];
+        // ترتيب الأوردرات تصاعدياً حسب التاريخ (من الأقدم للأحدث)
+        return orders.sort((a, b) => a.createTime - b.createTime);
     }
 
     private parseNumber(value: any): number {
