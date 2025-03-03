@@ -157,19 +157,23 @@ export const BinanceTab: React.FC = () => {
             if (startDate || endDate) {
                 const startTimestamp = startDate ? (() => {
                     const date = new Date(startDate);
-                    date.setHours(0, 0, 0, 0);
+                    // تحويل التاريخ المحلي إلى UTC
+                    date.setUTCHours(0, 0, 0, 0);
                     return date.getTime();
                 })() : undefined;
 
                 const endTimestamp = endDate ? (() => {
                     const date = new Date(endDate);
-                    date.setHours(23, 59, 59, 999);
+                    // تحويل التاريخ المحلي إلى UTC
+                    date.setUTCHours(23, 59, 59, 999);
                     return date.getTime();
                 })() : undefined;
                 
                 console.log('=== Debug Date Conversion ===');
-                console.log('Start Date String:', startDate ? new Date(startTimestamp!).toISOString() : null);
-                console.log('End Date String:', endDate ? new Date(endTimestamp!).toISOString() : null);
+                console.log('Local Start Date:', startDate);
+                console.log('Local End Date:', endDate);
+                console.log('UTC Start Date:', startTimestamp ? new Date(startTimestamp).toISOString() : null);
+                console.log('UTC End Date:', endTimestamp ? new Date(endTimestamp).toISOString() : null);
                 console.log('Start Timestamp:', startTimestamp);
                 console.log('End Timestamp:', endTimestamp);
                 
