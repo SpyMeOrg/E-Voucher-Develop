@@ -158,13 +158,13 @@ export const BinanceTab: React.FC = () => {
                 // تعيين التواريخ مع الأخذ في الاعتبار توقيت الإمارات (UTC+4)
                 const startTimestamp = startDate ? (() => {
                     const date = new Date(startDate);
-                    date.setHours(0, 0, 0, 0);
+                    date.setHours(-4, 0, 0, 0); // نطرح 4 ساعات من بداية اليوم
                     return date.getTime();
                 })() : undefined;
 
                 const endTimestamp = endDate ? (() => {
                     const date = new Date(endDate);
-                    date.setHours(23, 59, 59, 999);
+                    date.setHours(19, 59, 59, 999); // نطرح 4 ساعات من نهاية اليوم (23-4=19)
                     return date.getTime();
                 })() : undefined;
                 
