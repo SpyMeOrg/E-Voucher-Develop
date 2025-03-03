@@ -22,22 +22,22 @@ export class BinanceService {
 
     setDateRange(startTime?: number, endTime?: number) {
         if (startTime) {
-            // تحويل التاريخ إلى توقيت UTC
-            const startDate = new Date(startTime);
-            startDate.setHours(startDate.getHours() - 4); // تعويض فرق التوقيت
-            this.startTime = startDate.getTime();
+            // نستخدم التاريخ كما هو بدون تعديل
+            this.startTime = startTime;
         } else {
             this.startTime = undefined;
         }
 
         if (endTime) {
-            // تحويل التاريخ إلى توقيت UTC
-            const endDate = new Date(endTime);
-            endDate.setHours(endDate.getHours() - 4); // تعويض فرق التوقيت
-            this.endTime = endDate.getTime();
+            // نستخدم التاريخ كما هو بدون تعديل
+            this.endTime = endTime;
         } else {
             this.endTime = undefined;
         }
+
+        console.log('=== Debug Date Range ===');
+        console.log('Start Time:', this.startTime ? new Date(this.startTime).toISOString() : null);
+        console.log('End Time:', this.endTime ? new Date(this.endTime).toISOString() : null);
     }
 
     async checkServerTime(): Promise<number> {
