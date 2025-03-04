@@ -158,15 +158,15 @@ export const BinanceTab: React.FC = () => {
                 const startTimestamp = startDate ? (() => {
                     // إنشاء تاريخ بتوقيت الإمارات
                     const [year, month, day] = startDate.split('-').map(Number);
-                    // نضبط على بداية اليوم 20:00 UTC لليوم السابق (00:00 بتوقيت الإمارات لليوم المحدد)
-                    return Date.UTC(year, month - 1, day - 1, 20, 0, 0, 0);
+                    // نقص 4 ساعات من بداية الفترة
+                    return Date.UTC(year, month - 1, day, -4, 0, 0, 0);
                 })() : undefined;
 
                 const endTimestamp = endDate ? (() => {
                     // إنشاء تاريخ بتوقيت الإمارات
                     const [year, month, day] = endDate.split('-').map(Number);
-                    // نضبط على نهاية اليوم التالي 19:59:59.999 UTC (23:59:59.999 بتوقيت الإمارات)
-                    return Date.UTC(year, month - 1, day + 1, 19, 59, 59, 999);
+                    // نترك نهاية اليوم كما هي بتوقيت UTC
+                    return Date.UTC(year, month - 1, day, 23, 59, 59, 999);
                 })() : undefined;
                 
                 console.log('=== Debug Date Conversion ===');
