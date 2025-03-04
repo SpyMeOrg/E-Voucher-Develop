@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BinanceService } from '../services/binanceService';
 import { BinanceOrder, SavedCredential } from '../types/orders';
-import * as XLSX from 'xlsx';
 import { utils as xlsxUtils, writeFile } from 'xlsx';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
