@@ -157,15 +157,17 @@ export const BinanceTab: React.FC = () => {
             if (startDate || endDate) {
                 const startTimestamp = startDate ? (() => {
                     const date = new Date(startDate);
-                    // تحويل التاريخ المحلي إلى UTC
-                    date.setUTCHours(0, 0, 0, 0);
+                    // تحويل التاريخ المحلي إلى UTC مع الأخذ في الاعتبار فرق التوقيت
+                    const offset = date.getTimezoneOffset() * 60 * 1000;
+                    date.setTime(date.getTime() + offset);
                     return date.getTime();
                 })() : undefined;
 
                 const endTimestamp = endDate ? (() => {
                     const date = new Date(endDate);
-                    // تحويل التاريخ المحلي إلى UTC
-                    date.setUTCHours(23, 59, 59, 999);
+                    // تحويل التاريخ المحلي إلى UTC مع الأخذ في الاعتبار فرق التوقيت
+                    const offset = date.getTimezoneOffset() * 60 * 1000;
+                    date.setTime(date.getTime() + offset + (24 * 60 * 60 * 1000 - 1));
                     return date.getTime();
                 })() : undefined;
                 
@@ -707,7 +709,8 @@ export const BinanceTab: React.FC = () => {
                                             hour: '2-digit',
                                             minute: '2-digit',
                                             second: '2-digit',
-                                            hour12: false
+                                            hour12: false,
+                                            timeZone: 'Asia/Dubai' // تحديد المنطقة الزمنية للإمارات
                                         })}
                                     </td>
                                 </tr>
