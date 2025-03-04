@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BinanceService } from '../services/binanceService';
 import { BinanceOrder, SavedCredential } from '../types/orders';
+import * as XLSX from 'xlsx';
+import { utils as xlsxUtils, writeFile } from 'xlsx';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 export const BinanceTab: React.FC = () => {
     const [orders, setOrders] = useState<BinanceOrder[]>([]);
@@ -8,8 +12,8 @@ export const BinanceTab: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [apiKey, setApiKey] = useState('');
     const [secretKey, setSecretKey] = useState('');
-    const [startDate, setStartDate] = useState<string>('');
-    const [endDate, setEndDate] = useState<string>('');
+    const [startDate, setStartDate] = useState<Date | null>(null);
+    const [endDate, setEndDate] = useState<Date | null>(null);
     const [orderType, setOrderType] = useState<'ALL' | 'BUY' | 'SELL'>('ALL');
     const [orderStatus, setOrderStatus] = useState<'ALL' | 'COMPLETED' | 'CANCELLED'>('ALL');
     const [orderFeeType, setOrderFeeType] = useState<'ALL' | 'MAKER' | 'TAKER'>('ALL');
@@ -155,60 +159,29 @@ export const BinanceTab: React.FC = () => {
             const service = new BinanceService(apiKey, secretKey);
             
             if (startDate || endDate) {
-                const startTimestamp = startDate ? (() => {
-                    // إنشاء تاريخ حسب سياسة Binance
-                    const [year, month, day] = startDate.split('-').map(Number);
-                    return Date.UTC(year, month - 1, day, 0, 0, 0, 0);
-                })() : undefined;
-
-                const endTimestamp = endDate ? (() => {
-                    // إنشاء تاريخ حسب سياسة Binance
-                    const [year, month, day] = endDate.split('-').map(Number);
-                    return Date.UTC(year, month - 1, day, 23, 59, 59, 999);
-                })() : undefined;
-                
-                console.log('=== Debug Date Conversion ===');
-                console.log('Local Start Date:', startDate);
-                console.log('Local End Date:', endDate);
-                console.log('UAE Start DateTime:', startTimestamp ? new Date(startTimestamp).toLocaleString('en-GB', { timeZone: 'Asia/Dubai' }) : null);
-                console.log('UAE End DateTime:', endTimestamp ? new Date(endTimestamp).toLocaleString('en-GB', { timeZone: 'Asia/Dubai' }) : null);
-                console.log('Start Timestamp:', startTimestamp);
-                console.log('End Timestamp:', endTimestamp);
-
-                console.log('=== Debug Date Range ===');
-                console.log('Start Time:', startTimestamp ? new Date(startTimestamp).toISOString() : null);
-                console.log('End Time:', endTimestamp ? new Date(endTimestamp).toISOString() : null);
-
-                console.log('=== Debug Timestamps ===');
-                console.log('Start Time (raw):', startTimestamp);
-                console.log('End Time (raw):', endTimestamp);
-                console.log('Start Time (date):', startTimestamp ? new Date(startTimestamp).toISOString() : null);
-                console.log('End Time (date):', endTimestamp ? new Date(endTimestamp).toISOString() : null);
+                const startTimestamp = getStartTimestamp(startDate);
+                const endTimestamp = getEndTimestamp(endDate);
                 
                 service.setDateRange(startTimestamp, endTimestamp);
             }
 
-            const response = await service.getP2POrders(page);
+            // تعديل حجم الصفحة إلى 1000 لجلب أكبر عدد ممكن من الأوردرات
+            const response = await service.getP2POrders(page, 1000);
             
-            console.log('=== Debug Response Orders ===');
-            if (response.orders.length > 0) {
-                console.log('First Order:', {
-                    time: new Date(response.orders[0].createTime).toISOString(),
-                    raw: response.orders[0].createTime
-                });
-                console.log('Last Order:', {
-                    time: new Date(response.orders[response.orders.length - 1].createTime).toISOString(),
-                    raw: response.orders[response.orders.length - 1].createTime
-                });
-            }
+            let newOrders = response.orders;
+            
+            // ترتيب الأوردرات من الأحدث للأقدم
+            newOrders = newOrders.sort((a, b) => b.createTime - a.createTime);
 
             if (page === 1) {
-                setOrders(response.orders);
-                applyFilters(response.orders);
-            } else {
-                const newOrders = [...orders, ...response.orders];
                 setOrders(newOrders);
                 applyFilters(newOrders);
+            } else {
+                const allOrders = [...orders, ...newOrders];
+                // ترتيب جميع الأوردرات بعد الإضافة
+                const sortedOrders = allOrders.sort((a, b) => b.createTime - a.createTime);
+                setOrders(sortedOrders);
+                applyFilters(sortedOrders);
             }
             
             setTotalPages(response.totalPages);
@@ -250,14 +223,13 @@ export const BinanceTab: React.FC = () => {
         
         // فلتر التاريخ
         if (startDate) {
-            const startTimestamp = new Date(startDate).getTime();
+            const startTimestamp = getStartTimestamp(startDate);
             filtered = filtered.filter(order => order.createTime >= startTimestamp);
         }
         
         if (endDate) {
-            const endTimestamp = new Date(endDate);
-            endTimestamp.setHours(23, 59, 59, 999);
-            filtered = filtered.filter(order => order.createTime <= endTimestamp.getTime());
+            const endTimestamp = getEndTimestamp(endDate);
+            filtered = filtered.filter(order => order.createTime <= endTimestamp);
         }
         
         setFilteredOrders(filtered);
@@ -328,6 +300,73 @@ export const BinanceTab: React.FC = () => {
             )}
         </button>
     );
+
+    // إضافة دالة تصدير إلى Excel
+    const handleExportToExcel = () => {
+        try {
+            const exportData = orders.map(order => ({
+                'التاريخ': new Date(order.createTime).toLocaleString('ar-AE', {
+                    timeZone: 'Asia/Dubai',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                }),
+                'رقم الطلب': order.orderId,
+                'المبلغ': order.fiatAmount.toFixed(2),
+                'العملة': 'USDT',
+                'السعر': order.price.toFixed(2),
+                'العملة المحلية': 'AED',
+                'نوع الطلب': order.type === 'SELL' ? 'بيع' : 'شراء',
+                'الحالة': order.status === 'COMPLETED' ? 'مكتمل' : order.status
+            }));
+
+            const ws = xlsxUtils.json_to_sheet(exportData);
+            
+            // تعيين عرض الأعمدة
+            const colWidths = [
+                { wch: 20 }, // التاريخ
+                { wch: 15 }, // رقم الطلب
+                { wch: 10 }, // المبلغ
+                { wch: 8 },  // العملة
+                { wch: 10 }, // السعر
+                { wch: 8 },  // العملة المحلية
+                { wch: 8 },  // نوع الطلب
+                { wch: 10 }  // الحالة
+            ];
+            ws['!cols'] = colWidths;
+
+            const wb = xlsxUtils.book_new();
+            xlsxUtils.book_append_sheet(wb, ws, 'طلبات Binance');
+            
+            const fileName = `binance_orders_${new Date().toISOString().split('T')[0]}.xlsx`;
+            writeFile(wb, fileName);
+        } catch (error) {
+            console.error('Error exporting to Excel:', error);
+        }
+    };
+
+    const getStartTimestamp = (date: Date | null): number => {
+        if (!date) return 0;
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        return Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+    };
+
+    const getEndTimestamp = (date: Date | null): number => {
+        if (!date) return 0;
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        return Date.UTC(year, month - 1, day, 23, 59, 59, 999);
+    };
+
+    const handleDateChange = (date: Date | null, setDate: (date: Date | null) => void) => {
+        setDate(date);
+    };
 
     return (
         <div className="p-4">
@@ -531,10 +570,10 @@ export const BinanceTab: React.FC = () => {
                                 من تاريخ
                             </label>
                             <div className="relative">
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
+                                <DatePicker
+                                    selected={startDate}
+                                    onChange={(date: Date | null) => handleDateChange(date, setStartDate)}
+                                    dateFormat="yyyy/MM/dd"
                                     className="w-full p-2 border border-indigo-200 rounded-lg text-right focus:ring-2 focus:ring-indigo-300 focus:border-indigo-500 transition-all duration-200 pr-2"
                                 />
                                 <label 
@@ -556,10 +595,10 @@ export const BinanceTab: React.FC = () => {
                                 إلى تاريخ
                             </label>
                             <div className="relative">
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
+                                <DatePicker
+                                    selected={endDate}
+                                    onChange={(date: Date | null) => handleDateChange(date, setEndDate)}
+                                    dateFormat="yyyy/MM/dd"
                                     className="w-full p-2 border border-indigo-200 rounded-lg text-right focus:ring-2 focus:ring-indigo-300 focus:border-indigo-500 transition-all duration-200 pr-2"
                                 />
                                 <label 
@@ -649,8 +688,19 @@ export const BinanceTab: React.FC = () => {
                         <div className="text-sm text-gray-600">
                             تم العثور على <span className="font-bold text-indigo-600">{filteredOrders.length}</span> من إجمالي <span className="font-bold text-indigo-600">{totalOrders}</span> أوردر
                         </div>
-                        <div className="text-sm text-gray-600">
-                            الصفحة <span className="font-bold text-indigo-600">{currentPage}</span> من <span className="font-bold text-indigo-600">{totalPages}</span>
+                        <div className="flex items-center gap-2">
+                            <div className="text-sm text-gray-600">
+                                الصفحة <span className="font-bold text-indigo-600">{currentPage}</span> من <span className="font-bold text-indigo-600">{totalPages}</span>
+                            </div>
+                            <button
+                                onClick={handleExportToExcel}
+                                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                                </svg>
+                                <span>تصدير إلى Excel</span>
+                            </button>
                         </div>
                     </div>
 
