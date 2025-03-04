@@ -156,26 +156,22 @@ export const BinanceTab: React.FC = () => {
             
             if (startDate || endDate) {
                 const startTimestamp = startDate ? (() => {
-                    const date = new Date(startDate);
-                    // تحويل التاريخ المحلي إلى UTC مع الأخذ في الاعتبار فرق التوقيت
-                    const offset = date.getTimezoneOffset() * 60 * 1000;
-                    date.setTime(date.getTime() + offset);
+                    // إنشاء تاريخ بتوقيت الإمارات
+                    const date = new Date(startDate + 'T00:00:00+04:00');
                     return date.getTime();
                 })() : undefined;
 
                 const endTimestamp = endDate ? (() => {
-                    const date = new Date(endDate);
-                    // تحويل التاريخ المحلي إلى UTC مع الأخذ في الاعتبار فرق التوقيت
-                    const offset = date.getTimezoneOffset() * 60 * 1000;
-                    date.setTime(date.getTime() + offset + (24 * 60 * 60 * 1000 - 1));
+                    // إنشاء تاريخ بتوقيت الإمارات
+                    const date = new Date(endDate + 'T23:59:59.999+04:00');
                     return date.getTime();
                 })() : undefined;
                 
                 console.log('=== Debug Date Conversion ===');
                 console.log('Local Start Date:', startDate);
                 console.log('Local End Date:', endDate);
-                console.log('UTC Start Date:', startTimestamp ? new Date(startTimestamp).toISOString() : null);
-                console.log('UTC End Date:', endTimestamp ? new Date(endTimestamp).toISOString() : null);
+                console.log('UAE Start DateTime:', startDate ? new Date(startTimestamp!).toLocaleString('en-GB', { timeZone: 'Asia/Dubai' }) : null);
+                console.log('UAE End DateTime:', endDate ? new Date(endTimestamp!).toLocaleString('en-GB', { timeZone: 'Asia/Dubai' }) : null);
                 console.log('Start Timestamp:', startTimestamp);
                 console.log('End Timestamp:', endTimestamp);
                 
