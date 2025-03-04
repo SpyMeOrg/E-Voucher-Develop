@@ -156,16 +156,14 @@ export const BinanceTab: React.FC = () => {
             
             if (startDate || endDate) {
                 const startTimestamp = startDate ? (() => {
-                    // إنشاء تاريخ بتوقيت الإمارات
+                    // إنشاء تاريخ حسب سياسة Binance
                     const [year, month, day] = startDate.split('-').map(Number);
-                    // نقص 4 ساعات من بداية الفترة
-                    return Date.UTC(year, month - 1, day, -4, 0, 0, 0);
+                    return Date.UTC(year, month - 1, day, 0, 0, 0, 0);
                 })() : undefined;
 
                 const endTimestamp = endDate ? (() => {
-                    // إنشاء تاريخ بتوقيت الإمارات
+                    // إنشاء تاريخ حسب سياسة Binance
                     const [year, month, day] = endDate.split('-').map(Number);
-                    // نترك نهاية اليوم كما هي بتوقيت UTC
                     return Date.UTC(year, month - 1, day, 23, 59, 59, 999);
                 })() : undefined;
                 
