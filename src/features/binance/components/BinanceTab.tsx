@@ -157,23 +157,33 @@ export const BinanceTab: React.FC = () => {
             if (startDate || endDate) {
                 const startTimestamp = startDate ? (() => {
                     // إنشاء تاريخ بتوقيت الإمارات
-                    const date = new Date(startDate + 'T00:00:00+04:00');
-                    return date.getTime();
+                    const [year, month, day] = startDate.split('-').map(Number);
+                    return Date.UTC(year, month - 1, day, -4, 0, 0, 0);
                 })() : undefined;
 
                 const endTimestamp = endDate ? (() => {
                     // إنشاء تاريخ بتوقيت الإمارات
-                    const date = new Date(endDate + 'T23:59:59.999+04:00');
-                    return date.getTime();
+                    const [year, month, day] = endDate.split('-').map(Number);
+                    return Date.UTC(year, month - 1, day, 19, 59, 59, 999);
                 })() : undefined;
                 
                 console.log('=== Debug Date Conversion ===');
                 console.log('Local Start Date:', startDate);
                 console.log('Local End Date:', endDate);
-                console.log('UAE Start DateTime:', startDate ? new Date(startTimestamp!).toLocaleString('en-GB', { timeZone: 'Asia/Dubai' }) : null);
-                console.log('UAE End DateTime:', endDate ? new Date(endTimestamp!).toLocaleString('en-GB', { timeZone: 'Asia/Dubai' }) : null);
+                console.log('UAE Start DateTime:', startTimestamp ? new Date(startTimestamp).toLocaleString('en-GB', { timeZone: 'Asia/Dubai' }) : null);
+                console.log('UAE End DateTime:', endTimestamp ? new Date(endTimestamp).toLocaleString('en-GB', { timeZone: 'Asia/Dubai' }) : null);
                 console.log('Start Timestamp:', startTimestamp);
                 console.log('End Timestamp:', endTimestamp);
+
+                console.log('=== Debug Date Range ===');
+                console.log('Start Time:', startTimestamp ? new Date(startTimestamp).toISOString() : null);
+                console.log('End Time:', endTimestamp ? new Date(endTimestamp).toISOString() : null);
+
+                console.log('=== Debug Timestamps ===');
+                console.log('Start Time (raw):', startTimestamp);
+                console.log('End Time (raw):', endTimestamp);
+                console.log('Start Time (date):', startTimestamp ? new Date(startTimestamp).toISOString() : null);
+                console.log('End Time (date):', endTimestamp ? new Date(endTimestamp).toISOString() : null);
                 
                 service.setDateRange(startTimestamp, endTimestamp);
             }
